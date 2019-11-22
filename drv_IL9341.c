@@ -140,6 +140,28 @@ static int drv_IL9341_open(const char *section) {
 	return -1;
 }
 
+typedef struct{
+	int width;
+	int heigth;
+} WH;
+
+static WH drv_IL9341_get_dimensions(void)
+{
+	WH ret;
+	uint8_t buff[4];
+	if(usb_control_msg(lcd,USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_ENDPOINT_IN,2,0,0,buff,4,1000)<0)
+	{
+		error("%s: USB request failed!", Name);
+
+	    ret.width=-1;
+	    ret.heigth=-1;
+	    return ret;
+	}
+	ret.width=buff[0] | (buff[1]<<8);
+	ret.heigth=buff[2] | (buff[3]<<8);
+	return ret;
+}
+
 static int drv_IL9341_close(void) {
 	/* close whatever port you've opened */
     usb_release_interface(lcd, 0);
@@ -198,20 +220,6 @@ static int drv_IL9341_start(const char *section) {
 	char cmd[1];
 	int contrast;
 
-	/* read display size from config */
-	s = cfg_get(section, "Size", NULL);
-	if (s == NULL || *s == '\0') {
-		error("%s: no '%s.Size' entry from %s", Name, section, cfg_source());
-		return -1;
-	}
-
-	DROWS = -1;
-	DCOLS = -1;
-	if (sscanf(s, "%dx%d", &DCOLS, &DROWS) != 2 || DCOLS < 1 || DROWS < 1) {
-		error("%s: bad Size '%s' from %s", Name, s, cfg_source());
-		return -1;
-	}
-
 	s = cfg_get(section, "Font", "6x8");
 	if (s == NULL || *s == '\0') {
 		error("%s: no '%s.Font' entry from %s", Name, section, cfg_source());
@@ -237,6 +245,16 @@ static int drv_IL9341_start(const char *section) {
 		error("%s: could not find a IL9341 USB LCD", Name);
 		return -1;
 	}
+
+	WH dimensions = drv_IL9341_get_dimensions();
+
+	if(dimensions.heigth<0 || dimensions.width<0)
+	{
+		return -1;
+	}
+
+	DROWS = dimensions.heigth;
+	DCOLS = dimensions.width;
 
 	return 0;
 }
