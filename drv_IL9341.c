@@ -140,7 +140,7 @@ static int drv_IL9341_open(const char *section) {
 	return -1;
 }
 
-static int drv_Sample_close(void) {
+static int drv_IL9341_close(void) {
 	/* close whatever port you've opened */
     usb_release_interface(lcd, 0);
     usb_close(lcd);
@@ -309,7 +309,7 @@ int drv_IL9341_quit(const int quiet) {
 	drv_generic_graphic_quit();
 
 	debug("closing connection");
-	drv_Sample_close();
+	drv_IL9341_close();
 
 	return (0);
 }
