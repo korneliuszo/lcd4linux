@@ -65,6 +65,7 @@
 static char Name[] = "IL9341";
 static char *device_id = NULL, *bus_id = NULL;
 
+extern int got_signal;
 
 #define _RGB565_0(p) (( ((p.R) & 0xf8)      ) | (((p.G) & 0xe0) >> 5))
 #define _RGB565_1(p) (( ((p.G) & 0x1c) << 3 ) | (((p.B) & 0xf8) >> 3))
@@ -136,7 +137,7 @@ static int drv_IL9341_open(const char *section) {
 		}
 	}
 
-	return 0;
+	return -1;
 }
 
 static int drv_Sample_close(void) {
@@ -161,8 +162,15 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 	buff[6]=height;
 	buff[7]=height>>8;
 
-	usb_control_msg(lcd,USB_TYPE_VENDOR|USB_RECIP_INTERFACE,1,0,0,buff,8,1000);
+	if(usb_control_msg(lcd,USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_ENDPOINT_OUT,1,0,0,buff,8,1000)<0)
+	{
+		error("%s: USB request failed!", Name);
 
+		usb_release_interface(lcd, 0);
+		usb_close(lcd);
+	    got_signal = -1;
+	    return;
+	}
 	uint8_t *displaybuff=malloc(width*height*2);
 	size_t cntr=0;
 	for (r = row; r < row + height; r++) {
@@ -172,7 +180,15 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 			displaybuff[cntr++]=_RGB565_1(p);
 		}
 	}
-	usb_bulk_write(lcd,1,displaybuff,width*height*2,1000);
+	if(usb_bulk_write(lcd,1,displaybuff,width*height*2,1000)<0)
+	{
+		error("%s: USB request failed!", Name);
+
+		usb_release_interface(lcd, 0);
+		usb_close(lcd);
+	    got_signal = -1;
+	    return;
+	}
 	free(displaybuff);
 }
 
@@ -218,6 +234,7 @@ static int drv_IL9341_start(const char *section) {
 
 	/* open communication with the display */
 	if (drv_IL9341_open(section) < 0) {
+		error("%s: could not find a IL9341 USB LCD", Name);
 		return -1;
 	}
 
