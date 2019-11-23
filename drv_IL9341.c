@@ -71,6 +71,7 @@ extern int got_signal;
 #define _RGB565_1(p) (( ((p.G) & 0x1c) << 3 ) | (((p.B) & 0xf8) >> 3))
 
 static usb_dev_handle *lcd;
+static int orientation;
 
 /****************************************/
 /***  hardware dependant functions    ***/
@@ -175,14 +176,31 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 		const int width) {
 	int r, c;
 	uint8_t buff[8];
-	buff[0]=col;
-	buff[1]=col>>8;
-	buff[2]=row;
-	buff[3]=row>>8;
-	buff[4]=width;
-	buff[5]=width>>8;
-	buff[6]=height;
-	buff[7]=height>>8;
+	int rowr;
+	switch (orientation)
+	{
+	case 0:
+		buff[0]=col;
+		buff[1]=col>>8;
+		buff[2]=row;
+		buff[3]=row>>8;
+		buff[4]=width;
+		buff[5]=width>>8;
+		buff[6]=height;
+		buff[7]=height>>8;
+	break;
+	case 1:
+		rowr=DROWS-row-height;
+		buff[0]=rowr;
+		buff[1]=rowr>>8;
+		buff[2]=col;
+		buff[3]=col>>8;
+		buff[4]=height;
+		buff[5]=height>>8;
+		buff[6]=width;
+		buff[7]=width>>8;
+	break;
+	}
 
 	if(usb_control_msg(lcd,USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_ENDPOINT_OUT,1,0,0,buff,8,1000)<0)
 	{
@@ -195,12 +213,26 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 	}
 	uint8_t *displaybuff=malloc(width*height*2);
 	size_t cntr=0;
-	for (r = row; r < row + height; r++) {
-		for (c = col; c < col + width; c++) {
-			RGBA p =drv_generic_graphic_rgb(r,c);
-			displaybuff[cntr++]=_RGB565_0(p);
-			displaybuff[cntr++]=_RGB565_1(p);
+	switch (orientation)
+	{
+	case 0:
+		for (r = row; r < row + height; r++) {
+			for (c = col; c < col + width; c++) {
+				RGBA p =drv_generic_graphic_rgb(r,c);
+				displaybuff[cntr++]=_RGB565_0(p);
+				displaybuff[cntr++]=_RGB565_1(p);
+			}
 		}
+	break;
+	case 1:
+		for (c = col; c < col + width; c++) {
+			for (r = row+height-1; r >= row; r--) {
+				RGBA p =drv_generic_graphic_rgb(r,c);
+				displaybuff[cntr++]=_RGB565_0(p);
+				displaybuff[cntr++]=_RGB565_1(p);
+			}
+		}
+	break;
 	}
 	if(usb_bulk_write(lcd,1,displaybuff,width*height*2,1000)<0)
 	{
@@ -240,6 +272,13 @@ static int drv_IL9341_start(const char *section) {
 		return -1;
 	}
 
+	int i;
+    // Get the logical orientation (0 = landscape, 1 = portrait, 2 = reverse landscape, 3 = reverse portrait)
+    if (cfg_number(section, "Orientation", 0, 0, 1, &i) > 0)
+	orientation = i;
+    else
+	orientation = 0;
+
 	/* open communication with the display */
 	if (drv_IL9341_open(section) < 0) {
 		error("%s: could not find a IL9341 USB LCD", Name);
@@ -253,8 +292,9 @@ static int drv_IL9341_start(const char *section) {
 		return -1;
 	}
 
-	DROWS = dimensions.heigth;
-	DCOLS = dimensions.width;
+	int rotate90 = orientation % 2;
+	DROWS = rotate90 ? dimensions.width : dimensions.heigth;
+	DCOLS = rotate90 ? dimensions.heigth : dimensions.width;
 
 	return 0;
 }
