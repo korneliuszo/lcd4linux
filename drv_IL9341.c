@@ -234,7 +234,7 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 		}
 	break;
 	}
-	if(usb_bulk_write(lcd,1,displaybuff,width*height*2,1000)<0)
+	if(usb_bulk_write(lcd,1,displaybuff,width*height*2,2000)<0)
 	{
 		error("%s: USB request failed!", Name);
 
