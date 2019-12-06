@@ -208,6 +208,7 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 
 		usb_release_interface(lcd, 0);
 		usb_close(lcd);
+		lcd=NULL;
 	    got_signal = -1;
 	    return;
 	}
@@ -240,6 +241,7 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 
 		usb_release_interface(lcd, 0);
 		usb_close(lcd);
+		lcd=NULL;
 	    got_signal = -1;
 	    return;
 	}
