@@ -202,9 +202,12 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 	break;
 	}
 
-	if(usb_control_msg(lcd,USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_ENDPOINT_OUT,1,0,0,buff,8,1000)<0)
+	int err;
+	if((err=usb_control_msg(lcd,USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_ENDPOINT_OUT,1,0,0,buff,8,1000))<0)
 	{
-		error("%s: USB request failed!", Name);
+		error("%s: USB request control failed! %d: %s", Name, err, usb_strerror());
+		if (err == -32)
+			return; //Broken pipe sometimes happen, wait for next update
 
 		usb_release_interface(lcd, 0);
 		usb_close(lcd);
@@ -235,9 +238,9 @@ static void drv_IL9341_blit(const int row, const int col, const int height,
 		}
 	break;
 	}
-	if(usb_bulk_write(lcd,1,displaybuff,width*height*2,2000)<0)
+	if((err=usb_bulk_write(lcd,1,displaybuff,width*height*2,2000))<0)
 	{
-		error("%s: USB request failed!", Name);
+		error("%s: USB request failed! %d: %s", Name, err, usb_strerror());
 
 		usb_release_interface(lcd, 0);
 		usb_close(lcd);
